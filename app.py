@@ -581,13 +581,13 @@ elif page == "Budget Simulator":
 
     cols = st.columns(len(MEDIA_CHANNELS))
     spend_inputs = {}
-    step_map = {"tv": 10_000, "radio": 5_000, "ratp_display": 5_000, "google_ads": 1_000}
+    step_map = {"tv": 5_000, "radio": 2_000, "ratp_display": 2_000, "google_ads": 1_000}
     for i, ch in enumerate(MEDIA_CHANNELS):
         with cols[i]:
             spend_inputs[ch] = st.slider(
                 CHANNEL_LABELS[ch],
                 min_value=0,
-                max_value=int(nat[f"spend_{ch}"].max() * 2),
+                max_value=int(nat[f"spend_{ch}"].max() * 1.4),
                 value=int(avg_spend[ch]),
                 step=step_map[ch],
                 format="%d€",
@@ -747,7 +747,7 @@ elif page == "Forecast":
     uniform = st.checkbox("Same budget every week", value=True)
 
     avg_spend = {ch: nat[f"spend_{ch}"].mean() for ch in MEDIA_CHANNELS}
-    step_map = {"tv": 10_000, "radio": 5_000, "ratp_display": 5_000, "google_ads": 1_000}
+    step_map = {"tv": 5_000, "radio": 2_000, "ratp_display": 2_000, "google_ads": 1_000}
 
     week_budgets = []
     if uniform:
@@ -758,7 +758,7 @@ elif page == "Forecast":
                 base_budget[ch] = st.slider(
                     CHANNEL_LABELS[ch],
                     min_value=0,
-                    max_value=int(nat[f"spend_{ch}"].max() * 2),
+                    max_value=int(nat[f"spend_{ch}"].max() * 1.4),
                     value=int(avg_spend[ch]),
                     step=step_map[ch],
                     format="%d€",
@@ -775,7 +775,7 @@ elif page == "Forecast":
                     wb[ch] = st.slider(
                         CHANNEL_LABELS[ch],
                         min_value=0,
-                        max_value=int(nat[f"spend_{ch}"].max() * 2),
+                        max_value=int(nat[f"spend_{ch}"].max() * 1.4),
                         value=int(avg_spend[ch]),
                         step=step_map[ch],
                         format="%d€",
