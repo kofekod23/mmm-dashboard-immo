@@ -4,15 +4,17 @@
 
 ## What is this?
 
-Imagine you're a real estate company spending money on TV ads, radio spots, bus posters, and Google Ads. You want to know: **which channel actually brings customers, and where should I put my next euro?**
+This project is built for a **real estate listings platform** — a website that publishes property listings on behalf of real estate agencies who pay a subscription. The platform advertises across TV, radio, bus/metro posters, and Google Ads to generate **leads** (prospective buyers/renters who contact an agency) and **app downloads**.
 
-That's exactly what a **Media Mix Model (MMM)** does. It's a statistical model that looks at your past advertising spend and your results (leads, app downloads), and figures out how much each channel contributed — even when everything is running at the same time.
+The question is: **which advertising channel actually drives results, and where should the next euro go?**
+
+That's exactly what a **Media Mix Model (MMM)** does. It's a statistical model that looks at past advertising spend and results (leads, app downloads), and figures out how much each channel contributed — even when everything runs at the same time.
 
 ### The key insight
 
 Not all advertising works the same way:
 - **Google Ads** is like a light switch — you pay, you get clicks *right now*. Turn it off, it stops.
-- **TV and Radio** are more like planting seeds — people see/hear your ad, and weeks or months later, they remember your brand when they need a real estate agent. This is called **adstock** (the memory effect of advertising).
+- **TV and Radio** are more like planting seeds — people see/hear your ad, and weeks or months later, they remember the platform when they're looking for a property. This is called **adstock** (the memory effect of advertising).
 - **All channels saturate** — the first 10,000 euros on Google Ads bring more leads than the next 10,000. There are diminishing returns.
 
 ### What makes this project special
@@ -82,15 +84,17 @@ Without the Bayesian model, the dashboard falls back to a Ridge regression (fast
 
 ## C'est quoi ?
 
-Imaginez que vous etes un promoteur immobilier qui depense de l'argent en pub TV, radio, affiches dans le metro/bus, et Google Ads. Vous voulez savoir : **quel canal amene vraiment des clients, et ou mettre mon prochain euro ?**
+Ce projet est concu pour un **site d'annonces immobilieres** — une plateforme qui publie les annonces des agences immobilieres qui paient un abonnement. La plateforme fait de la pub en TV, radio, affichage bus/metro, et Google Ads pour generer des **leads** (acheteurs/locataires potentiels qui contactent une agence) et des **telechargements d'app**.
 
-C'est exactement ce que fait un **Media Mix Model (MMM)**. C'est un modele statistique qui regarde vos depenses publicitaires passees et vos resultats (leads, telechargements d'app), et determine combien chaque canal a contribue — meme quand tout tourne en meme temps.
+La question : **quel canal publicitaire genere vraiment des resultats, et ou mettre le prochain euro ?**
+
+C'est exactement ce que fait un **Media Mix Model (MMM)**. C'est un modele statistique qui regarde les depenses publicitaires passees et les resultats (leads, telechargements d'app), et determine combien chaque canal a contribue — meme quand tout tourne en meme temps.
 
 ### L'idee cle
 
 La pub ne fonctionne pas pareil selon le canal :
 - **Google Ads** c'est comme un interrupteur — vous payez, vous avez des clics *tout de suite*. Vous coupez, ca s'arrete.
-- **TV et Radio** c'est comme planter des graines — les gens voient/entendent la pub, et des semaines ou des mois plus tard, ils se souviennent de votre marque quand ils cherchent un bien. C'est l'**adstock** (l'effet memoire de la pub).
+- **TV et Radio** c'est comme planter des graines — les gens voient/entendent la pub, et des semaines ou des mois plus tard, ils se souviennent de la plateforme quand ils cherchent un bien. C'est l'**adstock** (l'effet memoire de la pub).
 - **Tous les canaux saturent** — les 10 000 premiers euros sur Google Ads ramenent plus de leads que les 10 000 suivants. Les rendements sont decroissants.
 
 ### Ce qui rend ce projet special
