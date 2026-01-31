@@ -276,7 +276,7 @@ def _mc_simulate_leads(bayesian, spend_inputs, nat, n_draws=1000):
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Fixed Costs", "SL Benchmark", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
+    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Model Validation", "Fixed Costs", "SL Benchmark", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
 )
 
 # ── Page: Overview ─────────────────────────────────────────────────────────────
@@ -1114,6 +1114,171 @@ elif page == "Goal Planner":
         )
         st.plotly_chart(fig_contrib, use_container_width=True)
 
+
+
+# ── Page: Model Validation ────────────────────────────────────────────────────
+
+elif page == "Model Validation":
+    log_visit("Model Validation")
+    st.title("Model Validation — 3-Month Forecast Backtest")
+
+    st.markdown("""
+**How reliable are the predictions?** To answer this, we train the model on older data and test it on
+the most recent 3 months (October - December 2025) — data the model has never seen.
+
+**Quelle fiabilite pour les predictions ?** Pour repondre, on entraine le modele sur les donnees anciennes
+et on le teste sur les 3 derniers mois (octobre - decembre 2025) — des donnees inconnues du modele.
+""")
+
+    import plotly.graph_objects as go
+    from sklearn.linear_model import Ridge
+    from sklearn.metrics import mean_absolute_error
+
+    nat = load_national()
+
+    # Split: train up to end Sep 2025, test = Oct-Dec 2025
+    train_mask = nat["date"] < "2025-10-01"
+    test_mask = nat["date"] >= "2025-10-01"
+    train_df = nat[train_mask]
+    test_df = nat[test_mask]
+
+    control_cols = ["interest_rate_20y", "pinel", "covid_impact"]
+
+    # Build features on full data (adstock needs history)
+    features_all = {}
+    for ch in MEDIA_CHANNELS:
+        raw = nat[f"spend_{ch}"].values
+        adstocked = geometric_adstock(raw, ADSTOCK_DECAY[ch])
+        saturated = hill_saturation(adstocked, SATURATION_ALPHA[ch])
+        features_all[f"sat_{ch}"] = saturated
+    for col in control_cols:
+        features_all[col] = nat[col].values
+
+    X_all = pd.DataFrame(features_all)
+    y_all = nat["leads"].values.astype(float)
+
+    n_train = train_mask.sum()
+    X_train, X_test = X_all.iloc[:n_train], X_all.iloc[n_train:]
+    y_train, y_test = y_all[:n_train], y_all[n_train:]
+
+    model = Ridge(alpha=1.0)
+    model.fit(X_train, y_train)
+
+    y_pred_test = model.predict(X_test)
+
+    # Calculate residual standard deviation from training set
+    y_pred_train = model.predict(X_train)
+    residuals = y_train - y_pred_train
+    residual_std = np.std(residuals)
+
+    # Standard error grows with forecast horizon (sqrt of weeks ahead)
+    n_test = len(y_test)
+    weeks_ahead = np.arange(1, n_test + 1)
+    se = residual_std * np.sqrt(weeks_ahead) / np.sqrt(n_train)
+    sd = residual_std * np.ones(n_test)
+
+    # 95% confidence interval (1.96 * SD for prediction interval)
+    ci_95_upper = y_pred_test + 1.96 * sd
+    ci_95_lower = y_pred_test - 1.96 * sd
+
+    # Growing uncertainty band (SE-based, widens over time)
+    ci_growing_upper = y_pred_test + 1.96 * residual_std * np.sqrt(weeks_ahead / weeks_ahead[0])
+    ci_growing_lower = y_pred_test - 1.96 * residual_std * np.sqrt(weeks_ahead / weeks_ahead[0])
+
+    test_dates = test_df["date"].values
+
+    # Metrics
+    mape = np.mean(np.abs((y_test - y_pred_test) / y_test)) * 100
+    mae = mean_absolute_error(y_test, y_pred_test)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Test period", f"{len(y_test)} weeks")
+    m2.metric("Avg error (MAPE)", f"{mape:.1f}%")
+    m3.metric("Avg absolute error", f"{mae:,.0f} leads/wk")
+    m4.metric("Residual Std Dev", f"{residual_std:,.0f} leads")
+
+    st.markdown("---")
+
+    # Chart: Actual vs Predicted with confidence bands
+    fig = go.Figure()
+
+    # 95% confidence band (growing uncertainty)
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([test_dates, test_dates[::-1]]),
+        y=np.concatenate([ci_growing_upper, ci_growing_lower[::-1]]),
+        fill="toself",
+        fillcolor="rgba(99, 110, 250, 0.15)",
+        line=dict(color="rgba(255,255,255,0)"),
+        name="95% Confidence Interval (widens over time)",
+        showlegend=True,
+    ))
+
+    # Fixed SD band
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([test_dates, test_dates[::-1]]),
+        y=np.concatenate([ci_95_upper, ci_95_lower[::-1]]),
+        fill="toself",
+        fillcolor="rgba(99, 110, 250, 0.08)",
+        line=dict(color="rgba(255,255,255,0)"),
+        name="95% Prediction Interval (fixed SD)",
+        showlegend=True,
+    ))
+
+    # Predicted
+    fig.add_trace(go.Scatter(
+        x=test_dates, y=y_pred_test,
+        mode="lines+markers",
+        name="Predicted",
+        line=dict(color="#636EFA", dash="dash"),
+    ))
+
+    # Actual
+    fig.add_trace(go.Scatter(
+        x=test_dates, y=y_test,
+        mode="lines+markers",
+        name="Actual",
+        line=dict(color="#EF553B"),
+    ))
+
+    fig.update_layout(
+        title="3-Month Backtest: Actual vs Predicted Leads (Oct-Dec 2025)",
+        xaxis_title="Date",
+        yaxis_title="Weekly Leads",
+        height=500,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.caption(
+        "**How to read this chart:** The red line shows actual weekly leads. The blue dashed line shows "
+        "the model's prediction. The light blue band is the 95% confidence interval — we expect the actual "
+        "value to fall inside this band 95% of the time. Notice how the band widens over time: "
+        "the further ahead we predict, the less certain we are."
+    )
+
+    # Weekly detail table
+    st.subheader("Week-by-Week Detail")
+    detail_df = pd.DataFrame({
+        "Week": [pd.Timestamp(d).strftime("%Y-%m-%d") for d in test_dates],
+        "Actual": y_test.astype(int),
+        "Predicted": y_pred_test.astype(int),
+        "Error (%)": [f"{abs(a-p)/a*100:.1f}%" for a, p in zip(y_test, y_pred_test)],
+        "CI 95% Low": ci_growing_lower.astype(int),
+        "CI 95% High": ci_growing_upper.astype(int),
+        "Inside CI?": ["Yes" if lo <= a <= hi else "No" for a, lo, hi in zip(y_test, ci_growing_lower, ci_growing_upper)],
+    })
+    st.dataframe(detail_df, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.subheader("What the metrics mean / Ce que signifient les metriques")
+    st.markdown("""
+| Metric | Meaning | Our result |
+|--------|---------|------------|
+| **Standard Deviation (SD)** | How spread out the model's errors are around zero. A smaller SD means more consistent predictions. | {sd:.0f} leads |
+| **Standard Error (SE)** | How precise our average prediction is. SE decreases with more training data. | Grows from {se_start:.0f} to {se_end:.0f} over 3 months |
+| **95% Confidence Interval** | The range where we're 95% sure the real value falls. Widens the further out we predict. | See chart above |
+| **MAPE** | Average percentage error — how far off are we on average? Below 5% is excellent. | **{mape:.1f}%** |
+""".format(sd=residual_std, se_start=se[0], se_end=se[-1], mape=mape))
 
 
 # ── Page: Fixed Costs ─────────────────────────────────────────────────────────
