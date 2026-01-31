@@ -574,11 +574,27 @@ elif page == "Budget Simulator":
     else:
         st.warning("**Ridge fallback** — point estimates only. Fit the Bayesian model on Colab GPU for confidence intervals.")
 
-    st.markdown("Adjust weekly spend per channel to see predicted leads in real time.")
+    st.markdown("Adjust weekly media buy per channel. TV, Radio and RATP have fixed annual production costs (creative, filming, printing) amortized over 52 weeks. **Google Ads is the main adjustment lever** — no fixed cost, instant effect.")
+
+    # Annual fixed production costs (creative/production)
+    FIXED_ANNUAL_COST = {
+        "tv": 50_000,       # filming the ad
+        "radio": 15_000,    # recording the spot
+        "ratp_display": 20_000,  # design + printing
+        "google_ads": 0,    # no fixed cost
+    }
+    fixed_weekly = {ch: FIXED_ANNUAL_COST[ch] / 52 for ch in MEDIA_CHANNELS}
+
+    # Show fixed costs
+    with st.expander("Fixed annual production costs (amortized weekly)"):
+        fc_cols = st.columns(len(MEDIA_CHANNELS))
+        for i, ch in enumerate(MEDIA_CHANNELS):
+            fc_cols[i].metric(CHANNEL_LABELS[ch], f"{FIXED_ANNUAL_COST[ch]:,}€/yr", delta=f"{fixed_weekly[ch]:,.0f}€/wk")
 
     # Compute defaults from average spend
     avg_spend = {ch: nat[f"spend_{ch}"].mean() for ch in MEDIA_CHANNELS}
 
+    st.markdown("#### Weekly media buy (diffusion)")
     cols = st.columns(len(MEDIA_CHANNELS))
     spend_inputs = {}
     step_map = {"tv": 5_000, "radio": 2_000, "ratp_display": 2_000, "google_ads": 1_000}
@@ -614,7 +630,9 @@ elif page == "Budget Simulator":
         predicted_leads += coefficients.get(ctrl, 0) * avg_val
 
     predicted_leads = max(0, predicted_leads)
-    total_weekly_spend = sum(spend_inputs.values())
+    total_weekly_media = sum(spend_inputs.values())
+    total_weekly_fixed = sum(fixed_weekly.values())
+    total_weekly_spend = total_weekly_media + total_weekly_fixed
 
     # Bayesian Monte Carlo CI
     mc_result = None
@@ -623,20 +641,21 @@ elif page == "Budget Simulator":
 
     # Display results
     st.markdown("---")
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     if mc_result:
         c1.metric("Predicted Weekly Leads", f"{mc_result['leads_mean']:,.0f}", help="Bayesian posterior mean prediction.")
         c1.caption(f"HDI 94%: [{mc_result['leads_hdi_3']:,.0f} – {mc_result['leads_hdi_97']:,.0f}]")
     else:
         c1.metric("Predicted Weekly Leads", f"{predicted_leads:,.0f}", help="Ridge point estimate.")
-    c2.metric("Total Weekly Spend", format_euros(total_weekly_spend))
+    c2.metric("Weekly Media Buy", format_euros(total_weekly_media), help="Diffusion cost only (sliders).")
+    c3.metric("Total Weekly Cost", format_euros(total_weekly_spend), help="Media buy + amortized production costs.")
     cpa_leads = mc_result["leads_mean"] if mc_result else predicted_leads
     cpa = total_weekly_spend / max(cpa_leads, 1)
-    c3.metric("CPA (Cost per Lead)", format_euros(cpa))
+    c4.metric("CPA (all-in)", format_euros(cpa), help="Total cost (media + production) per lead.")
     if mc_result:
         cpa_lo = total_weekly_spend / max(mc_result["leads_hdi_97"], 1)
         cpa_hi = total_weekly_spend / max(mc_result["leads_hdi_3"], 1)
-        c3.caption(f"HDI 94%: [{format_euros(cpa_lo)} – {format_euros(cpa_hi)}]")
+        c4.caption(f"HDI 94%: [{format_euros(cpa_lo)} – {format_euros(cpa_hi)}]")
 
     # Channel CPA breakdown
     st.subheader("Channel-Level Metrics")
@@ -644,30 +663,38 @@ elif page == "Budget Simulator":
         mc_ch = mc_result["channel_contribs"]
         sim_df = pd.DataFrame({
             "Channel": [CHANNEL_LABELS[ch] for ch in MEDIA_CHANNELS],
-            "Weekly Spend (€)": [spend_inputs[ch] for ch in MEDIA_CHANNELS],
+            "Media Buy (€/wk)": [spend_inputs[ch] for ch in MEDIA_CHANNELS],
+            "Prod Cost (€/wk)": [fixed_weekly[ch] for ch in MEDIA_CHANNELS],
+            "Total Cost (€/wk)": [spend_inputs[ch] + fixed_weekly[ch] for ch in MEDIA_CHANNELS],
             "Contrib (leads)": [mc_ch[ch]["mean"] for ch in MEDIA_CHANNELS],
             "Contrib HDI 3%": [mc_ch[ch]["hdi_3"] for ch in MEDIA_CHANNELS],
             "Contrib HDI 97%": [mc_ch[ch]["hdi_97"] for ch in MEDIA_CHANNELS],
-            "CPA (€/lead)": [spend_inputs[ch] / max(mc_ch[ch]["mean"], 0.01) for ch in MEDIA_CHANNELS],
+            "CPA all-in (€)": [(spend_inputs[ch] + fixed_weekly[ch]) / max(mc_ch[ch]["mean"], 0.01) for ch in MEDIA_CHANNELS],
         })
         st.dataframe(sim_df.style.format({
-            "Weekly Spend (€)": "{:,.0f}",
+            "Media Buy (€/wk)": "{:,.0f}",
+            "Prod Cost (€/wk)": "{:,.0f}",
+            "Total Cost (€/wk)": "{:,.0f}",
             "Contrib (leads)": "{:,.1f}",
             "Contrib HDI 3%": "{:,.1f}",
             "Contrib HDI 97%": "{:,.1f}",
-            "CPA (€/lead)": "{:,.1f}",
+            "CPA all-in (€)": "{:,.1f}",
         }), use_container_width=True)
     else:
         sim_df = pd.DataFrame({
             "Channel": [CHANNEL_LABELS[ch] for ch in MEDIA_CHANNELS],
-            "Weekly Spend (€)": [spend_inputs[ch] for ch in MEDIA_CHANNELS],
+            "Media Buy (€/wk)": [spend_inputs[ch] for ch in MEDIA_CHANNELS],
+            "Prod Cost (€/wk)": [fixed_weekly[ch] for ch in MEDIA_CHANNELS],
+            "Total Cost (€/wk)": [spend_inputs[ch] + fixed_weekly[ch] for ch in MEDIA_CHANNELS],
             "Contrib (leads)": [channel_contribs[ch] for ch in MEDIA_CHANNELS],
-            "CPA (€/lead)": [spend_inputs[ch] / max(channel_contribs[ch], 0.01) for ch in MEDIA_CHANNELS],
+            "CPA all-in (€)": [(spend_inputs[ch] + fixed_weekly[ch]) / max(channel_contribs[ch], 0.01) for ch in MEDIA_CHANNELS],
         })
         st.dataframe(sim_df.style.format({
-            "Weekly Spend (€)": "{:,.0f}",
+            "Media Buy (€/wk)": "{:,.0f}",
+            "Prod Cost (€/wk)": "{:,.0f}",
+            "Total Cost (€/wk)": "{:,.0f}",
             "Contrib (leads)": "{:,.1f}",
-            "CPA (€/lead)": "{:,.1f}",
+            "CPA all-in (€)": "{:,.1f}",
         }), use_container_width=True)
 
     # Pie chart of contributions
@@ -676,9 +703,9 @@ elif page == "Budget Simulator":
     pie_col1, pie_col2 = st.columns(2)
     with pie_col1:
         spend_pie = px.pie(
-            values=[spend_inputs[ch] for ch in MEDIA_CHANNELS],
+            values=[spend_inputs[ch] + fixed_weekly[ch] for ch in MEDIA_CHANNELS],
             names=[CHANNEL_LABELS[ch] for ch in MEDIA_CHANNELS],
-            title="Spend Allocation",
+            title="Total Cost Allocation (media + production)",
         )
         st.plotly_chart(spend_pie, use_container_width=True)
     with pie_col2:
