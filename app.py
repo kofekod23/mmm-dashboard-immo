@@ -274,9 +274,25 @@ def _mc_simulate_leads(bayesian, spend_inputs, nat, n_draws=1000):
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
+st.sidebar.markdown("**Analysis**")
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Model Validation", "Fixed Costs", "SL Benchmark", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
+    [
+        "Overview",
+        "Channel Contributions",
+        "Response Curves",
+        "Model Validation",
+        "Budget Simulator",
+        "Forecast",
+        "Goal Planner",
+        "Regional Analysis",
+        "Fixed Costs",
+        "SL Benchmark",
+        "FAQ",
+        "FAQ (FR)",
+        "Admin",
+    ],
+    label_visibility="collapsed",
 )
 
 # ── Page: Overview ─────────────────────────────────────────────────────────────
@@ -850,9 +866,9 @@ elif page == "Forecast":
             fc_hdi_97_list.append(mc_hi)
             predicted = max(0, mc_leads)
 
-        # Downloads estimate
-        digital_boost = week_contribs.get("google_ads", 0) * 0.5
-        downloads = int(predicted * 2.1 + digital_boost)
+        # Downloads estimate: use historical ratio
+        hist_dl_ratio = nat["app_downloads"].mean() / max(nat["leads"].mean(), 1)
+        downloads = int(predicted * hist_dl_ratio)
 
         row = {
             "Week": f"W{w+1} — {forecast_weeks[w].strftime('%d %b')}",
