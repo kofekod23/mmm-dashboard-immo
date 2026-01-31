@@ -276,7 +276,7 @@ def _mc_simulate_leads(bayesian, spend_inputs, nat, n_draws=1000):
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
+    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Fixed Costs", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
 )
 
 # ── Page: Overview ─────────────────────────────────────────────────────────────
@@ -1116,6 +1116,74 @@ elif page == "Goal Planner":
         )
         st.plotly_chart(fig_contrib, use_container_width=True)
 
+
+
+# ── Page: Fixed Costs ─────────────────────────────────────────────────────────
+
+elif page == "Fixed Costs":
+    log_visit("Fixed Costs")
+    st.title("Fixed Production Costs")
+
+    st.markdown("""
+Advertising isn't just about buying media time — before you can air a single ad, you need to **produce it**.
+These are fixed costs that don't depend on how much you spend on diffusion. They are paid once per year
+(or per campaign cycle) regardless of the media budget.
+
+---
+
+La publicite, ce n'est pas que l'achat d'espace — avant de diffuser une seule pub, il faut **la produire**.
+Ce sont des couts fixes, independants du budget de diffusion. Ils sont payes une fois par an
+(ou par cycle de campagne), quel que soit le budget media.
+""")
+
+    st.subheader("TV — 50 000 EUR/year")
+    st.markdown("""
+- **Filming the ad** (tournage) : scriptwriting, actors, crew, studio or location, post-production
+- Typically shot once a year, then aired in **4 monthly bursts** (e.g. Jan, Apr, Sep, Nov) on channels like BFM
+- The same creative can be reused across bursts, but a fresh version is usually produced annually
+- This cost is **incompressible** — you can't run TV without producing the spot first
+""")
+
+    st.subheader("Radio — 15 000 EUR/year")
+    st.markdown("""
+- **Recording the spot** (enregistrement) : voiceover talent, sound design, studio time
+- Much lighter production than TV — no video, no actors on set
+- Aired in **6 monthly bursts** per year (e.g. Jan, Mar, May, Jul, Sep, Nov)
+- Can be updated more easily mid-year if messaging changes
+""")
+
+    st.subheader("RATP / Bus — 20 000 EUR/year")
+    st.markdown("""
+- **Design + printing** (maquettes et impression) : graphic design, large format printing
+- Posters for bus shelters, metro stations (IDF only)
+- Aired in **4 monthly bursts** per year (e.g. Feb, May, Sep, Nov)
+- New creative can be produced per burst, but typically 1-2 designs per year
+""")
+
+    st.subheader("Google Ads — 0 EUR fixed")
+    st.markdown("""
+- **No production cost** — ads are text/image based, created directly in the platform
+- **100% variable** — every euro goes to media buy
+- This is the **main adjustment lever**: you can scale up or down instantly, with immediate effect on leads
+- Unlike TV/Radio/RATP, stopping Google Ads **immediately stops** lead generation from this channel (no adstock memory effect)
+""")
+
+    st.markdown("---")
+
+    # Summary table
+    st.subheader("Summary / Resume")
+    cost_df = pd.DataFrame({
+        "Channel": ["TV (BFM etc.)", "Radio", "RATP / Bus", "Google Ads"],
+        "Annual Prod. Cost": ["50 000 EUR", "15 000 EUR", "20 000 EUR", "0 EUR"],
+        "Weekly Amortized": ["962 EUR/wk", "288 EUR/wk", "385 EUR/wk", "0 EUR/wk"],
+        "Bursts / Year": ["4 months", "6 months", "4 months", "Always-on"],
+        "Flexibility": ["Low — plan months ahead", "Medium — easier to adjust", "Low — print lead times", "High — instant on/off"],
+        "Adstock (memory)": ["Very high (months)", "High (months)", "Medium (weeks)", "Near zero (instant)"],
+    })
+    st.dataframe(cost_df, use_container_width=True, hide_index=True)
+
+    st.info("**Key takeaway / Point cle :** Google Ads is the only channel where 100% of the budget goes to diffusion with zero production cost and instant effect. "
+            "For TV, Radio and RATP, factor in the fixed production costs when evaluating true CPA — especially at low media budgets where the fixed cost weighs heavily.")
 
 
 # ── Page: Regional Analysis ────────────────────────────────────────────────────
