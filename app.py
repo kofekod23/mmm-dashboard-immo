@@ -875,29 +875,34 @@ elif page == "Forecast":
         fmt_dict["Leads HDI 97%"] = "{:,}"
     st.dataframe(fc_df.style.format(fmt_dict), use_container_width=True)
 
-    # Weekly chart with error bars
+    # Weekly chart with confidence band
     fc_fig = go.Figure()
     if bayesian and fc_hdi_3_list:
-        fc_fig.add_trace(go.Bar(
-            x=fc_df["Week"], y=fc_df["Leads"], name="Predicted Leads",
-            error_y=dict(
-                type="data",
-                symmetric=False,
-                array=[fc_hdi_97_list[i] - fc_df["Leads"].iloc[i] for i in range(4)],
-                arrayminus=[fc_df["Leads"].iloc[i] - fc_hdi_3_list[i] for i in range(4)],
-            ),
+        # Confidence band (shaded area between low and high)
+        fc_fig.add_trace(go.Scatter(
+            x=list(fc_df["Week"]) + list(fc_df["Week"][::-1]),
+            y=fc_hdi_97_list + fc_hdi_3_list[::-1],
+            fill="toself",
+            fillcolor="rgba(99, 110, 250, 0.2)",
+            line=dict(color="rgba(255,255,255,0)"),
+            name="94% Confidence Range",
+            showlegend=True,
         ))
-    else:
-        fc_fig.add_trace(go.Bar(x=fc_df["Week"], y=fc_df["Leads"], name="Predicted Leads"))
-    fc_fig.add_trace(go.Scatter(x=fc_df["Week"], y=fc_df["App Downloads"], name="App Downloads", mode="lines+markers", yaxis="y2"))
+    fc_fig.add_trace(go.Scatter(
+        x=fc_df["Week"], y=fc_df["Leads"], name="Predicted Leads",
+        mode="lines+markers",
+        line=dict(color="#636EFA", width=3),
+    ))
+    fc_fig.add_trace(go.Scatter(x=fc_df["Week"], y=fc_df["App Downloads"], name="App Downloads", mode="lines+markers", yaxis="y2", line=dict(color="#EF553B")))
     fc_fig.update_layout(
         yaxis=dict(title="Leads"),
         yaxis2=dict(title="Downloads", overlaying="y", side="right"),
         height=400,
     )
     st.plotly_chart(fc_fig, use_container_width=True)
-    st.caption("**How to read this chart:** Bars show predicted weekly leads (error bars = 94% confidence range if advanced model is loaded), "
-               "the line shows predicted app downloads.")
+    st.caption("**How to read this chart:** The blue line shows predicted weekly leads with the shaded band "
+               "representing the 94% confidence range (if the advanced model is loaded). "
+               "The red line shows predicted app downloads.")
 
     # Recommendations
     st.subheader("Recommendations")
