@@ -274,25 +274,11 @@ def _mc_simulate_leads(bayesian, spend_inputs, nat, n_draws=1000):
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
-st.sidebar.markdown("**Analysis**")
 page = st.sidebar.radio(
     "Navigation",
-    [
-        "Overview",
-        "Channel Contributions",
-        "Response Curves",
-        "Model Validation",
-        "Budget Simulator",
-        "Forecast",
-        "Goal Planner",
-        "Regional Analysis",
-        "Fixed Costs",
-        "SL Benchmark",
-        "FAQ",
-        "FAQ (FR)",
-        "Admin",
-    ],
-    label_visibility="collapsed",
+    ["Overview", "Channel Contributions", "Response Curves", "Model Validation",
+     "Budget Simulator", "Forecast", "Goal Planner", "Regional Analysis",
+     "Fixed Costs", "SL Benchmark", "FAQ", "FAQ (FR)", "Admin"],
 )
 
 # ── Page: Overview ─────────────────────────────────────────────────────────────
