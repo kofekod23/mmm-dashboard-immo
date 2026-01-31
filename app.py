@@ -276,7 +276,7 @@ def _mc_simulate_leads(bayesian, spend_inputs, nat, n_draws=1000):
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Fixed Costs", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
+    ["Overview", "Channel Contributions", "Response Curves", "Budget Simulator", "Forecast", "Goal Planner", "Fixed Costs", "SL Benchmark", "Regional Analysis", "FAQ", "FAQ (FR)", "Admin"],
 )
 
 # ── Page: Overview ─────────────────────────────────────────────────────────────
@@ -1184,6 +1184,132 @@ Ce sont des couts fixes, independants du budget de diffusion. Ils sont payes une
 
     st.info("**Key takeaway / Point cle :** Google Ads is the only channel where 100% of the budget goes to diffusion with zero production cost and instant effect. "
             "For TV, Radio and RATP, factor in the fixed production costs when evaluating true CPA — especially at low media budgets where the fixed cost weighs heavily.")
+
+
+# ── Page: SL Benchmark ────────────────────────────────────────────────────────
+
+elif page == "SL Benchmark":
+    log_visit("SL Benchmark")
+    st.title("SL Benchmark — Market Leader Reference")
+
+    st.markdown("""
+This page compares our model's assumptions with publicly available data from **SL**,
+the leading French real estate listings platform (~14.6% market share, 21M monthly unique visitors).
+
+Cette page compare les hypotheses de notre modele avec les donnees publiques de **SL**,
+leader francais des annonces immobilieres (~14.6% de part de marche, 21M de visiteurs uniques/mois).
+""")
+
+    st.subheader("Lead Volume / Volume de leads")
+    vol_cols = st.columns(4)
+    vol_cols[0].metric("Leads / year", "48M", help="All contact types: calls, forms, callback requests")
+    vol_cols[1].metric("Leads / month", "~4M")
+    vol_cols[2].metric("Leads / day", "~130K", delta="1.5 leads/sec")
+    vol_cols[3].metric("Leads per sale", "~50", help="50 leads across all portals to close 1 transaction")
+
+    st.caption("30% of leads are never opened or processed by agencies — a major inefficiency in the funnel.")
+
+    st.markdown("---")
+    st.subheader("Annual Budget — ~20M EUR")
+
+    budget_data = pd.DataFrame({
+        "Channel": ["TV & Offline", "Google Ads (SEA)", "Social & App Install", "SEO & Content"],
+        "Share": ["50%", "25%", "15%", "10%"],
+        "Annual Budget": ["10M EUR", "5M EUR", "3M EUR", "2M EUR"],
+        "Role": [
+            "Brand awareness + Drive-to-App",
+            "Capture immediate search intent",
+            "Demographic targeting + Retention",
+            "Long-term 'free' leads via organic traffic",
+        ],
+    })
+    st.dataframe(budget_data, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.subheader("Seasonality & Media Rhythm / Saisonnalite")
+
+    season_data = pd.DataFrame({
+        "Period": ["Jan-Feb", "Mar-Jun", "Jul-Aug", "Sep-Oct", "Nov-Dec"],
+        "Intensity": ["Low", "VERY HIGH", "Low", "HIGH", "Medium"],
+        "Budget / month": ["~1.0M EUR", "~2.5M EUR", "~0.8M EUR", "~2.2M EUR", "~1.2M EUR"],
+        "Leads / month": ["~3.0M", "~5.5M", "~2.5M", "~5.0M", "~3.5M"],
+        "Focus": [
+            "SEO prep, retargeting",
+            "Spring peak — TV wave 1 (families preparing Sept moves)",
+            "Students / rentals, app installs",
+            "Back-to-school — TV wave 2",
+            "Sellers planning January projects",
+        ],
+    })
+    st.dataframe(season_data, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.subheader("Cost Benchmarks / Couts de reference")
+
+    cost_data = pd.DataFrame({
+        "Metric": [
+            "CPL Google Ads (renter/buyer)",
+            "CPL Google Ads (seller — high value)",
+            "CPL Google Ads (investor — new builds)",
+            "CPI Google App Campaigns",
+            "CPI Apple Search Ads",
+            "CPI Meta (Facebook/Instagram)",
+            "TV budget per wave",
+            "TV waves per year",
+            "TV contacts per wave",
+        ],
+        "SL (estimated)": [
+            "5-15 EUR",
+            "60-120 EUR",
+            "80-150 EUR",
+            "2.50-6.00 EUR",
+            "4.00-8.50 EUR",
+            "1.50-4.00 EUR",
+            "2-4M EUR",
+            "3-4 waves",
+            "~120-140M contacts (25-49 yr)",
+        ],
+        "Our model": [
+            "~37 EUR (blended)",
+            "N/A (single lead type)",
+            "N/A",
+            "N/A (not modeled separately)",
+            "N/A",
+            "N/A",
+            "~50K EUR (4 bursts)",
+            "4 bursts",
+            "N/A (smaller scale)",
+        ],
+    })
+    st.dataframe(cost_data, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.subheader("Key Takeaways / Points cles")
+
+    st.markdown("""
+**Scale matters / L'echelle compte :**
+- SL's blended CPL is ~0.42 EUR/lead thanks to massive brand awareness, SEO traffic, and economies of scale
+- A mid-size player without brand recognition pays 50-200x more per lead
+- Our model's CPLs (37-93 EUR) are realistic for a smaller platform
+
+**TV is a brand machine / La TV est une machine a notoriete :**
+- SL spends 10M EUR/year on TV — 50% of total budget
+- TV doesn't generate leads directly, but creates the brand reflex that drives organic and app traffic months later
+- The adstock (memory effect) of TV is the longest of all channels
+
+**Google Ads is the control lever / Google Ads est le levier de controle :**
+- 25% of SL's budget (5M EUR) goes to SEA
+- Instant effect, no production cost, precise targeting
+- But CPL varies 10x depending on lead type (renter vs seller vs investor)
+
+**The app is the retention play / L'app est le levier de retention :**
+- App users are 3-4x more active than web users
+- Push notifications are free (vs paid email/SMS)
+- CPI of 2.50-6 EUR per install, but only 1 in 4 installs becomes an active user
+""")
+
+    st.info("**Note:** SL data is based on public estimates and industry benchmarks (2025-2026). "
+            "Actual figures may differ. Our model uses synthetic data calibrated to a mid-size player, not SL's scale.")
 
 
 # ── Page: Regional Analysis ────────────────────────────────────────────────────
