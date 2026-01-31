@@ -570,9 +570,9 @@ elif page == "Budget Simulator":
         st.stop()
 
     if bayesian:
-        st.info("**Bayesian model loaded** — predictions include 94% credible intervals (HDI 3%–97%) via Monte Carlo simulation (1 000 draws).")
+        st.info("**Advanced model loaded** — predictions include a confidence range: instead of one number, you get a min-max range that covers 94% of likely outcomes.")
     else:
-        st.warning("**Ridge fallback** — point estimates only. Fit the Bayesian model on Colab GPU for confidence intervals.")
+        st.warning("**Simple model** — shows a single estimate without confidence range. Train the advanced model on Colab GPU for min-max predictions.")
 
     st.markdown("Adjust weekly media buy per channel. TV, Radio and RATP have fixed annual production costs (creative, filming, printing) amortized over 52 weeks. **Google Ads is the main adjustment lever** — no fixed cost, instant effect.")
 
@@ -644,7 +644,7 @@ elif page == "Budget Simulator":
     c1, c2, c3, c4 = st.columns(4)
     if mc_result:
         c1.metric("Predicted Weekly Leads", f"{mc_result['leads_mean']:,.0f}", help="Bayesian posterior mean prediction.")
-        c1.caption(f"HDI 94%: [{mc_result['leads_hdi_3']:,.0f} – {mc_result['leads_hdi_97']:,.0f}]")
+        c1.caption(f"Range (94%): [{mc_result['leads_hdi_3']:,.0f} – {mc_result['leads_hdi_97']:,.0f}]")
     else:
         c1.metric("Predicted Weekly Leads", f"{predicted_leads:,.0f}", help="Ridge point estimate.")
     c2.metric("Weekly Media Buy", format_euros(total_weekly_media), help="Diffusion cost only (sliders).")
@@ -655,7 +655,7 @@ elif page == "Budget Simulator":
     if mc_result:
         cpa_lo = total_weekly_spend / max(mc_result["leads_hdi_97"], 1)
         cpa_hi = total_weekly_spend / max(mc_result["leads_hdi_3"], 1)
-        c4.caption(f"HDI 94%: [{format_euros(cpa_lo)} – {format_euros(cpa_hi)}]")
+        c4.caption(f"Range (94%): [{format_euros(cpa_lo)} – {format_euros(cpa_hi)}]")
 
     # Channel CPA breakdown
     st.subheader("Channel-Level Metrics")
@@ -740,11 +740,11 @@ elif page == "Forecast":
         "to prioritize or scale back based on current saturation levels."
     )
     if bayesian:
-        st.info("**Bayesian model loaded** — forecasts include 94% credible intervals.")
+        st.info("**Advanced model loaded** — forecasts include a confidence range (min-max covering 94% of likely outcomes).")
     else:
         st.warning(
-            "**Ridge fallback** — point estimates only. "
-            "Fit the Bayesian model on Colab GPU for confidence intervals."
+            "**Simple model** — shows a single estimate without confidence range. "
+            "Train the advanced model on Colab GPU for min-max predictions."
         )
 
     coefficients = results["coefficients"]
@@ -898,7 +898,7 @@ elif page == "Forecast":
         height=400,
     )
     st.plotly_chart(fc_fig, use_container_width=True)
-    st.caption("**How to read this chart:** Bars show predicted weekly leads (error bars = 94% HDI if Bayesian), "
+    st.caption("**How to read this chart:** Bars show predicted weekly leads (error bars = 94% confidence range if advanced model is loaded), "
                "the line shows predicted app downloads.")
 
     # Recommendations
@@ -965,7 +965,7 @@ elif page == "Goal Planner":
         st.warning("Model not fitted yet.")
         st.stop()
 
-    st.info("**Bayesian model loaded** — optimization uses posterior saturation curves with uncertainty.")
+    st.info("**Advanced model loaded** — optimization accounts for diminishing returns and includes a confidence range on all predictions.")
 
     st.markdown(
         "Enter your weekly lead target. The greedy optimizer allocates budget to the channel "
@@ -1072,7 +1072,7 @@ elif page == "Goal Planner":
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Expected Leads", f"{mc_opt['leads_mean']:,.0f}")
-    c1.caption(f"HDI 94%: [{mc_opt['leads_hdi_3']:,.0f} – {mc_opt['leads_hdi_97']:,.0f}]")
+    c1.caption(f"Range (94%): [{mc_opt['leads_hdi_3']:,.0f} – {mc_opt['leads_hdi_97']:,.0f}]")
     c2.metric("Total Weekly Spend", format_euros(total_budget))
     cpa_opt = total_budget / max(mc_opt["leads_mean"], 1)
     c3.metric("Blended CPA", format_euros(cpa_opt))
