@@ -4,7 +4,7 @@
 
 ## What is this?
 
-This project is built for a **real estate listings platform** — a website that publishes property listings on behalf of real estate agencies who pay a subscription. The platform advertises across TV, radio, bus/metro posters, and Google Ads to generate **leads** (prospective buyers/renters who contact an agency) and **app downloads**.
+This project is built for a **real estate listings platform** — a website that publishes property listings on behalf of real estate agencies who pay a subscription. The platform advertises across TV, Google Ads (SEA), Meta (Facebook/Instagram), Google Play and Apple Search Ads to generate **leads** (prospective buyers/renters who contact an agency) and **app downloads**.
 
 The question is: **which advertising channel actually drives results, and where should the next euro go?**
 
@@ -14,7 +14,9 @@ That's exactly what a **Media Mix Model (MMM)** does. It's a statistical model t
 
 Not all advertising works the same way:
 - **Google Ads** is like a light switch — you pay, you get clicks *right now*. Turn it off, it stops.
-- **TV and Radio** are more like planting seeds — people see/hear your ad, and weeks or months later, they remember the platform when they're looking for a property. This is called **adstock** (the memory effect of advertising).
+- **TV** is more like planting seeds — people see your ad, and weeks or months later, they remember the platform when they're looking for a property. This is called **adstock** (the memory effect of advertising).
+- **Meta (Facebook/Instagram)** sits in between — some retargeting memory, but mostly immediate social engagement.
+- **App install campaigns** (Google Play, Apple) drive downloads that become active users generating leads over time.
 - **All channels saturate** — the first 10,000 euros on Google Ads bring more leads than the next 10,000. There are diminishing returns.
 
 ### What makes this project special
@@ -25,12 +27,13 @@ This project uses **Bayesian inference** — instead of giving you one number ("
 
 | Channel | Annual Budget | CPA (Cost Per Lead) | Adstock (memory) |
 |---------|--------------|-------------------|-----------------|
-| Google Ads | ~2.8M EUR | ~37 EUR | Near zero (instant) |
-| RATP/Bus | ~560K EUR | ~47 EUR | Medium (weeks) |
-| Radio | ~850K EUR | ~53 EUR | High (months) |
-| TV (BFM etc.) | ~1.2M EUR | ~93 EUR | Very high (months) |
+| Google Ads (SEA) | ~5M EUR | ~10 EUR | Near zero (instant) |
+| Meta (FB/Insta) | ~2M EUR | ~15 EUR | Low-medium (weeks) |
+| Google Play | ~600K EUR | ~6 EUR (CPI) | Low (days) |
+| Apple Search Ads | ~400K EUR | ~7 EUR (CPI) | Low (days) |
+| TV | ~10M EUR | ~50 EUR | Very high (months) |
 
-- **Model accuracy (R2):** Ridge = 0.74, Bayesian = ~0.83
+- **Data calibrated to SL's publicly available benchmarks** (~20M EUR annual budget, 48M leads/year)
 - Google Ads is the cheapest per lead, TV is the most expensive but builds long-term brand awareness
 
 ## How it works — the simple version
@@ -84,7 +87,7 @@ Without the Bayesian model, the dashboard falls back to a Ridge regression (fast
 
 ## C'est quoi ?
 
-Ce projet est concu pour un **site d'annonces immobilieres** — une plateforme qui publie les annonces des agences immobilieres qui paient un abonnement. La plateforme fait de la pub en TV, radio, affichage bus/metro, et Google Ads pour generer des **leads** (acheteurs/locataires potentiels qui contactent une agence) et des **telechargements d'app**.
+Ce projet est concu pour un **site d'annonces immobilieres** — une plateforme qui publie les annonces des agences immobilieres qui paient un abonnement. La plateforme fait de la pub en TV, Google Ads (SEA), Meta (Facebook/Instagram), Google Play et Apple Search Ads pour generer des **leads** (acheteurs/locataires potentiels qui contactent une agence) et des **telechargements d'app**.
 
 La question : **quel canal publicitaire genere vraiment des resultats, et ou mettre le prochain euro ?**
 
@@ -94,7 +97,9 @@ C'est exactement ce que fait un **Media Mix Model (MMM)**. C'est un modele stati
 
 La pub ne fonctionne pas pareil selon le canal :
 - **Google Ads** c'est comme un interrupteur — vous payez, vous avez des clics *tout de suite*. Vous coupez, ca s'arrete.
-- **TV et Radio** c'est comme planter des graines — les gens voient/entendent la pub, et des semaines ou des mois plus tard, ils se souviennent de la plateforme quand ils cherchent un bien. C'est l'**adstock** (l'effet memoire de la pub).
+- **La TV** c'est comme planter des graines — les gens voient la pub, et des semaines ou des mois plus tard, ils se souviennent de la plateforme quand ils cherchent un bien. C'est l'**adstock** (l'effet memoire de la pub).
+- **Meta (Facebook/Instagram)** est entre les deux — du retargeting, de l'engagement social, un peu de memoire.
+- **Les campagnes d'installation** (Google Play, Apple) generent des telechargements qui deviennent des utilisateurs actifs.
 - **Tous les canaux saturent** — les 10 000 premiers euros sur Google Ads ramenent plus de leads que les 10 000 suivants. Les rendements sont decroissants.
 
 ### Ce qui rend ce projet special
@@ -105,12 +110,13 @@ Ce projet utilise l'**inference bayesienne** — au lieu de donner un seul chiff
 
 | Canal | Budget annuel | CPA (Cout Par Lead) | Adstock (memoire) |
 |-------|--------------|-------------------|-----------------|
-| Google Ads | ~2.8M EUR | ~37 EUR | Quasi nul (instantane) |
-| RATP/Bus | ~560K EUR | ~47 EUR | Moyen (semaines) |
-| Radio | ~850K EUR | ~53 EUR | Eleve (mois) |
-| TV (BFM etc.) | ~1.2M EUR | ~93 EUR | Tres eleve (mois) |
+| Google Ads (SEA) | ~5M EUR | ~10 EUR | Quasi nul (instantane) |
+| Meta (FB/Insta) | ~2M EUR | ~15 EUR | Faible-moyen (semaines) |
+| Google Play | ~600K EUR | ~6 EUR (CPI) | Faible (jours) |
+| Apple Search Ads | ~400K EUR | ~7 EUR (CPI) | Faible (jours) |
+| TV | ~10M EUR | ~50 EUR | Tres eleve (mois) |
 
-- **Precision du modele (R2) :** Ridge = 0.74, Bayesien = ~0.83
+- **Donnees calibrees sur les benchmarks publics de SL** (~20M EUR budget annuel, 48M leads/an)
 - Google Ads est le moins cher par lead, la TV est la plus chere mais construit la notoriete long terme
 
 ## Comment ca marche — version simple

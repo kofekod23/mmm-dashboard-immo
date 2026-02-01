@@ -1,13 +1,20 @@
 """
-Streamlit Dashboard for MMM Real Estate POC.
+Streamlit Dashboard for MMM Real Estate POC. v2.0
 
 Pages:
 1. Overview — KPIs, temporal evolution, regional breakdown
 2. Channel Contributions — waterfall, contribution %, ROAS
 3. Response Curves — saturation curves per channel
-4. Budget Simulator — sliders, real-time prediction, CPA, optimization
-5. Regional Analysis — heatmap, regional performance
+4. Model Validation — 3-month backtest with confidence bands
+5. Budget Simulator — sliders, real-time prediction, CPA, optimization
+6. Forecast — 4-week predictions
+7. Goal Planner — reverse optimization
+8. Fixed Costs — production costs breakdown
+9. SL Benchmark — market leader reference
+10. Regional Analysis — heatmap, regional performance
 """
+import sys
+print(f"[STARTUP] app.py v2.0 loaded, pages in sidebar: 13", file=sys.stderr)
 
 import json
 import datetime
@@ -34,7 +41,7 @@ from src.utils import (
 DATA_DIR = Path("data/generated")
 MODEL_DIR = Path("data/model")
 
-st.set_page_config(page_title="MMM Real Estate Dashboard", layout="wide")
+st.set_page_config(page_title="MMM Dashboard v2", layout="wide")
 
 # ── Floating popup navigation ──────────────────────────────────────────────────
 st.markdown("""
@@ -351,7 +358,7 @@ elif page == "Overview":
     col1.metric("Total Leads", f"{nat['leads'].sum():,}", help="Total number of qualified leads generated across all regions and weeks. A lead is a potential customer who submitted a contact request to a real estate agency.")
     col2.metric("Total Downloads", f"{nat['app_downloads'].sum():,}", help="Total mobile app downloads over the period. Downloads are correlated with leads but also driven by digital campaigns (especially Google Ads).")
     total_spend = sum(nat[f"spend_{ch}"].sum() for ch in MEDIA_CHANNELS)
-    col3.metric("Total Media Spend", format_euros(total_spend), help="Sum of all media investment across TV, Radio, RATP Display, and Google Ads over the entire period (2020–2025).")
+    col3.metric("Total Media Spend", format_euros(total_spend), help="Sum of all media investment across TV, Google Ads, Meta, Google Play and Apple Search Ads over the entire period (2020–2025).")
     col4.metric("Avg Weekly Leads", f"{nat['leads'].mean():,.0f}", help="Average number of leads generated per week at the national level. Useful as a baseline to compare simulator predictions against.")
 
     # Temporal evolution
@@ -367,7 +374,7 @@ elif page == "Overview":
                "(summer dips in July–August, year-end slowdowns in December).")
 
     # Media spend over time
-    st.subheader("Weekly Media Spend by Channel", help="Stacked area chart of weekly media investment by channel. TV runs in 4 monthly bursts (Jan, Apr, Sep, Nov), Radio in 6 bursts, RATP/Bus in 4 bursts, and Google Ads runs year-round.")
+    st.subheader("Weekly Media Spend by Channel", help="Stacked area chart of weekly media investment by channel. TV runs in 4 waves (Mar, May, Sep, Nov), Google Ads and Meta run year-round with seasonal adjustments, Google Play and Apple push harder in spring/summer.")
     spend_fig = go.Figure()
     for ch in MEDIA_CHANNELS:
         spend_fig.add_trace(go.Scatter(
@@ -377,9 +384,9 @@ elif page == "Overview":
     spend_fig.update_layout(xaxis_title="Date", yaxis_title="Spend (€)", height=400)
     st.plotly_chart(spend_fig, use_container_width=True)
     st.caption("**How to read this chart:** Stacked area chart — the total height at any point represents combined weekly media spend. "
-               "Each colored band is one channel. TV appears in sharp monthly bursts (Jan, Apr, Sep, Nov — like real BFM-style campaigns), "
-               "Radio runs 6 bursts per year, RATP/Bus 4 bursts, while Google Ads forms a continuous always-on baseline "
-               "with mild seasonal variation (spring boost, slight summer dip).")
+               "Each colored band is one channel. TV appears in sharp waves (Mar, May, Sep, Nov), "
+               "Google Ads and Meta form continuous always-on baselines with seasonal variation, "
+               "while Google Play and Apple Search Ads are smaller but peak during spring/summer app-push periods.")
 
     # Regional breakdown
     st.subheader("Leads by Region", help="Total leads per region over the entire period. Île-de-France dominates (~25% of national volume), followed by Auvergne-Rhône-Alpes and PACA.")
@@ -390,7 +397,7 @@ elif page == "Overview":
     st.caption("**How to read this chart:** Horizontal bar chart ranking regions by total lead volume. "
                "Bar length is proportional to leads generated over the entire 2020–2025 period. "
                "Île-de-France leads by far (~25% of national volume), reflecting both population density "
-               "and the exclusive impact of RATP Display advertising in that region.")
+               "and higher digital ad spending density in the capital.")
 
     # Macro variables
     st.subheader("Macro Environment", help="Key external factors affecting real estate demand. Interest rates rose sharply in 2022-2023, depressing buyer appetite. The Pinel tax incentive was phased out from 2023 to 2025.")
@@ -479,8 +486,8 @@ elif page == "Channel Contributions":
         st.plotly_chart(contrib_fig, use_container_width=True)
         st.caption("**How to read this chart:** Stacked area showing each channel's weekly lead contribution over time. "
                    "The total height represents all media-attributed leads for that week. "
-                   "Notice how TV and Radio contributions persist between bursts thanks to adstock (brand memory effect), "
-                   "while Google Ads contributions follow spend almost instantly.")
+                   "Notice how TV contributions persist between waves thanks to adstock (brand memory effect), "
+                   "while Google Ads and app install contributions follow spend almost instantly.")
 
     # Model fit
     if preds is not None:
@@ -574,14 +581,15 @@ elif page == "Budget Simulator":
     else:
         st.warning("**Simple model** — shows a single estimate without confidence range. Train the advanced model on Colab GPU for min-max predictions.")
 
-    st.markdown("Adjust weekly media buy per channel. TV, Radio and RATP have fixed annual production costs (creative, filming, printing) amortized over 52 weeks. **Google Ads is the main adjustment lever** — no fixed cost, instant effect.")
+    st.markdown("Adjust weekly media buy per channel. TV has high fixed production costs. Meta requires creative production. **Google Ads, Google Play and Apple Search Ads are pure performance levers** — no fixed cost, instant effect.")
 
     # Annual fixed production costs (creative/production)
     FIXED_ANNUAL_COST = {
-        "tv": 50_000,       # filming the ad
-        "radio": 15_000,    # recording the spot
-        "ratp_display": 20_000,  # design + printing
+        "tv": 500_000,      # SL-scale TV production (multiple creatives/year)
         "google_ads": 0,    # no fixed cost
+        "meta": 100_000,    # creative & video production
+        "google_play": 50_000,  # app screenshots, ASO
+        "apple_search_ads": 30_000,  # similar app store assets
     }
     fixed_weekly = {ch: FIXED_ANNUAL_COST[ch] / 52 for ch in MEDIA_CHANNELS}
 
@@ -597,7 +605,7 @@ elif page == "Budget Simulator":
     st.markdown("#### Weekly media buy (diffusion)")
     cols = st.columns(len(MEDIA_CHANNELS))
     spend_inputs = {}
-    step_map = {"tv": 5_000, "radio": 2_000, "ratp_display": 2_000, "google_ads": 1_000}
+    step_map = {"tv": 50_000, "google_ads": 5_000, "meta": 2_000, "google_play": 1_000, "apple_search_ads": 500}
     for i, ch in enumerate(MEDIA_CHANNELS):
         with cols[i]:
             spend_inputs[ch] = st.slider(
@@ -774,7 +782,7 @@ elif page == "Forecast":
     uniform = st.checkbox("Same budget every week", value=True)
 
     avg_spend = {ch: nat[f"spend_{ch}"].mean() for ch in MEDIA_CHANNELS}
-    step_map = {"tv": 5_000, "radio": 2_000, "ratp_display": 2_000, "google_ads": 1_000}
+    step_map = {"tv": 50_000, "google_ads": 5_000, "meta": 2_000, "google_play": 1_000, "apple_search_ads": 500}
 
     week_budgets = []
     if uniform:
@@ -1306,36 +1314,42 @@ Ce sont des couts fixes, independants du budget de diffusion. Ils sont payes une
 (ou par cycle de campagne), quel que soit le budget media.
 """)
 
-    st.subheader("TV — 50 000 EUR/year")
+    st.subheader("TV — 500 000 EUR/year")
     st.markdown("""
-- **Filming the ad** (tournage) : scriptwriting, actors, crew, studio or location, post-production
-- Typically shot once a year, then aired in **4 monthly bursts** (e.g. Jan, Apr, Sep, Nov) on channels like BFM
-- The same creative can be reused across bursts, but a fresh version is usually produced annually
-- This cost is **incompressible** — you can't run TV without producing the spot first
+- **Production** (tournage) : scriptwriting, actors/celebrities, crew, studio or location, post-production
+- Multiple creatives produced per year for different campaign waves (Mar, May, Sep, Nov)
+- At SL's scale, TV production involves professional agencies and high production value
+- This cost is **incompressible** — you can't run TV without producing the spots first
 """)
 
-    st.subheader("Radio — 15 000 EUR/year")
+    st.subheader("Meta (Facebook/Instagram) — 100 000 EUR/year")
     st.markdown("""
-- **Recording the spot** (enregistrement) : voiceover talent, sound design, studio time
-- Much lighter production than TV — no video, no actors on set
-- Aired in **6 monthly bursts** per year (e.g. Jan, Mar, May, Jul, Sep, Nov)
-- Can be updated more easily mid-year if messaging changes
+- **Creative production** : video ads, carousel images, story formats, A/B testing variants
+- Social media requires a constant stream of fresh creatives to avoid ad fatigue
+- Professional video + graphic design team, or external agency
+- Always-on channel with seasonal intensity peaks (spring, back-to-school)
 """)
 
-    st.subheader("RATP / Bus — 20 000 EUR/year")
+    st.subheader("Google Play — 50 000 EUR/year")
     st.markdown("""
-- **Design + printing** (maquettes et impression) : graphic design, large format printing
-- Posters for bus shelters, metro stations (IDF only)
-- Aired in **4 monthly bursts** per year (e.g. Feb, May, Sep, Nov)
-- New creative can be produced per burst, but typically 1-2 designs per year
+- **App Store Optimization (ASO)** : screenshots, preview videos, A/B testing store pages
+- App install campaign creatives (video, banners)
+- Seasonal updates aligned with rental/buying peaks
 """)
 
-    st.subheader("Google Ads — 0 EUR fixed")
+    st.subheader("Apple Search Ads — 30 000 EUR/year")
     st.markdown("""
-- **No production cost** — ads are text/image based, created directly in the platform
+- **App Store assets** : similar to Google Play — screenshots, preview videos, keyword research
+- Apple-specific creative formats and guidelines
+- Smaller budget but higher CPI than Google Play
+""")
+
+    st.subheader("Google Ads (SEA) — 0 EUR fixed")
+    st.markdown("""
+- **No production cost** — ads are text-based, created directly in the platform
 - **100% variable** — every euro goes to media buy
-- This is the **main adjustment lever**: you can scale up or down instantly, with immediate effect on leads
-- Unlike TV/Radio/RATP, stopping Google Ads **immediately stops** lead generation from this channel (no adstock memory effect)
+- This is the **main adjustment lever**: scale up or down instantly, with immediate effect on leads
+- Stopping Google Ads **immediately stops** lead generation from this channel (no adstock memory effect)
 """)
 
     st.markdown("---")
@@ -1343,17 +1357,17 @@ Ce sont des couts fixes, independants du budget de diffusion. Ils sont payes une
     # Summary table
     st.subheader("Summary / Resume")
     cost_df = pd.DataFrame({
-        "Channel": ["TV (BFM etc.)", "Radio", "RATP / Bus", "Google Ads"],
-        "Annual Prod. Cost": ["50 000 EUR", "15 000 EUR", "20 000 EUR", "0 EUR"],
-        "Weekly Amortized": ["962 EUR/wk", "288 EUR/wk", "385 EUR/wk", "0 EUR/wk"],
-        "Bursts / Year": ["4 months", "6 months", "4 months", "Always-on"],
-        "Flexibility": ["Low — plan months ahead", "Medium — easier to adjust", "Low — print lead times", "High — instant on/off"],
-        "Adstock (memory)": ["Very high (months)", "High (months)", "Medium (weeks)", "Near zero (instant)"],
+        "Channel": ["TV", "Google Ads (SEA)", "Meta (FB/Insta)", "Google Play", "Apple Search Ads"],
+        "Annual Prod. Cost": ["500 000 EUR", "0 EUR", "100 000 EUR", "50 000 EUR", "30 000 EUR"],
+        "Weekly Amortized": ["9 615 EUR/wk", "0 EUR/wk", "1 923 EUR/wk", "962 EUR/wk", "577 EUR/wk"],
+        "Pattern": ["4 waves/year", "Always-on", "Always-on", "Always-on", "Always-on"],
+        "Flexibility": ["Low — plan months ahead", "High — instant on/off", "Medium — need creatives", "Medium — ASO lead time", "Medium — ASO lead time"],
+        "Adstock (memory)": ["Very high (months)", "Near zero (instant)", "Low-medium (weeks)", "Low (days)", "Low (days)"],
     })
     st.dataframe(cost_df, use_container_width=True, hide_index=True)
 
-    st.info("**Key takeaway / Point cle :** Google Ads is the only channel where 100% of the budget goes to diffusion with zero production cost and instant effect. "
-            "For TV, Radio and RATP, factor in the fixed production costs when evaluating true CPA — especially at low media budgets where the fixed cost weighs heavily.")
+    st.info("**Key takeaway / Point cle :** Google Ads is the only channel where 100% of the budget goes to media buy with zero production cost and instant effect. "
+            "TV production at SL's scale is a major cost center (500K€/year). Digital channels (Meta, Play, Apple) have moderate creative costs.")
 
 
 # ── Page: SL Benchmark ────────────────────────────────────────────────────────
@@ -1440,15 +1454,15 @@ leader francais des annonces immobilieres (~14.6% de part de marche, 21M de visi
             "~120-140M contacts (25-49 yr)",
         ],
         "Our model": [
-            "~37 EUR (blended)",
-            "N/A (single lead type)",
-            "N/A",
-            "N/A (not modeled separately)",
-            "N/A",
-            "N/A",
-            "~50K EUR (4 bursts)",
-            "4 bursts",
-            "N/A (smaller scale)",
+            "~10 EUR (blended)",
+            "Included in blended",
+            "Included in blended",
+            "~6 EUR (modeled)",
+            "~7 EUR (modeled)",
+            "~15 EUR (modeled)",
+            "~2.5M EUR (4 waves)",
+            "4 waves",
+            "SL-scale calibration",
         ],
     })
     st.dataframe(cost_data, use_container_width=True, hide_index=True)
@@ -1459,8 +1473,8 @@ leader francais des annonces immobilieres (~14.6% de part de marche, 21M de visi
     st.markdown("""
 **Scale matters / L'echelle compte :**
 - SL's blended CPL is ~0.42 EUR/lead thanks to massive brand awareness, SEO traffic, and economies of scale
-- A mid-size player without brand recognition pays 50-200x more per lead
-- Our model's CPLs (37-93 EUR) are realistic for a smaller platform
+- Our model is now calibrated to SL's scale (~20M budget, 48M leads/year)
+- Most leads come from organic/brand traffic — media drives incremental leads on top
 
 **TV is a brand machine / La TV est une machine a notoriete :**
 - SL spends 10M EUR/year on TV — 50% of total budget
@@ -1476,10 +1490,11 @@ leader francais des annonces immobilieres (~14.6% de part de marche, 21M de visi
 - App users are 3-4x more active than web users
 - Push notifications are free (vs paid email/SMS)
 - CPI of 2.50-6 EUR per install, but only 1 in 4 installs becomes an active user
+- Google Play + Apple Search Ads are now modeled as separate channels
 """)
 
     st.info("**Note:** SL data is based on public estimates and industry benchmarks (2025-2026). "
-            "Actual figures may differ. Our model uses synthetic data calibrated to a mid-size player, not SL's scale.")
+            "Actual figures may differ. Our model uses synthetic data calibrated to SL's scale and channel mix.")
 
 
 # ── Page: Regional Analysis ────────────────────────────────────────────────────
@@ -1503,7 +1518,7 @@ elif page == "Regional Analysis":
     st.plotly_chart(fig, use_container_width=True)
     st.caption("**How to read this chart:** Horizontal bar chart showing total leads for the selected year, ranked by region. "
                "Use the year selector above to compare how regional performance evolves over time. "
-               "The ranking reflects both population size and local media exposure (RATP only benefits IDF).")
+               "The ranking reflects population size, local demand, and digital ad density.")
 
     # Heatmap: Region × Channel spend
     st.subheader("Media Spend Heatmap (Region × Channel)")
@@ -1518,37 +1533,35 @@ elif page == "Regional Analysis":
     fig_heat.update_layout(height=500)
     st.plotly_chart(fig_heat, use_container_width=True)
     st.caption("**How to read this chart:** Each cell shows the total media spend for a given region (row) and channel (column). "
-               "Darker/warmer colors indicate higher spend. Notice the RATP Display column: only Île-de-France has spend, "
-               "all other regions are zero. TV and Google Ads are distributed proportionally to regional population weight.")
+               "Darker/warmer colors indicate higher spend. All channels are distributed proportionally to regional population weight. "
+               "Île-de-France dominates due to its 25% weight.")
 
-    # IDF focus — RATP impact
-    st.subheader("Île-de-France — RATP Display Impact")
+    # IDF focus — top region
+    st.subheader("Île-de-France — Leads & Google Ads Spend")
     idf = reg[reg["region"] == "Île-de-France"].copy()
     idf_fig = go.Figure()
     idf_fig.add_trace(go.Scatter(x=idf["date"], y=idf["leads"], name="IDF Leads", mode="lines"))
-    idf_fig.add_trace(go.Bar(x=idf["date"], y=idf["spend_ratp_display"], name="RATP Spend (€)", yaxis="y2", opacity=0.3))
+    idf_fig.add_trace(go.Bar(x=idf["date"], y=idf["spend_google_ads"], name="Google Ads Spend (€)", yaxis="y2", opacity=0.3))
     idf_fig.update_layout(
         yaxis=dict(title="Leads"),
-        yaxis2=dict(title="RATP Spend (€)", overlaying="y", side="right"),
+        yaxis2=dict(title="Google Ads Spend (€)", overlaying="y", side="right"),
         height=400,
     )
     st.plotly_chart(idf_fig, use_container_width=True)
     st.caption("**How to read this chart:** Dual-axis chart for Île-de-France only. "
-               "The blue line (left axis) shows weekly IDF leads; the gray bars (right axis) show RATP/Bus spend. "
-               "RATP runs in 4 monthly bursts per year (Feb, May, Sep, Nov). "
-               "Look for correlation between spend bursts and lead uplifts in IDF.")
+               "The blue line (left axis) shows weekly IDF leads; the gray bars (right axis) show Google Ads spend. "
+               "Google Ads is always-on with seasonal variation (spring boost, summer dip). "
+               "IDF represents ~25% of national volume.")
 
     # Regional performance table
     st.subheader("Regional Performance Summary")
+    spend_agg = {f"total_spend_{ch}": (f"spend_{ch}", "sum") for ch in MEDIA_CHANNELS}
     summary = year_data.groupby("region").agg(
         total_leads=("leads", "sum"),
         total_downloads=("app_downloads", "sum"),
-        total_spend_tv=("spend_tv", "sum"),
-        total_spend_radio=("spend_radio", "sum"),
-        total_spend_ratp=("spend_ratp_display", "sum"),
-        total_spend_google=("spend_google_ads", "sum"),
+        **spend_agg,
     ).reset_index()
-    summary["total_spend"] = summary[["total_spend_tv", "total_spend_radio", "total_spend_ratp", "total_spend_google"]].sum(axis=1)
+    summary["total_spend"] = summary[[f"total_spend_{ch}" for ch in MEDIA_CHANNELS]].sum(axis=1)
     summary["cpa"] = summary["total_spend"] / summary["total_leads"].clip(lower=1)
     summary = summary.sort_values("total_leads", ascending=False)
     st.dataframe(
@@ -1577,7 +1590,7 @@ elif page == "FAQ":
     with st.expander("What is a Media Mix Model (MMM)?", expanded=True):
         st.markdown("""
 A **Media Mix Model** is a statistical model that measures the impact of each media channel
-(TV, Radio, Digital, Out-of-Home...) on business KPIs — here, **leads** (qualified contact requests
+(TV, Google Ads, Meta, Google Play, Apple Search Ads) on business KPIs — here, **leads** (qualified contact requests
 sent to real estate agencies) and **app downloads** (mobile application installs).
 
 It allows you to:
@@ -1587,11 +1600,11 @@ It allows you to:
 - **Isolate media effects** from external factors (seasonality, interest rates, COVID...)
 
 Unlike digital attribution (last-click, multi-touch), MMM works on aggregated data
-and captures offline media effects (TV, Radio, Out-of-Home) as well.
+and captures offline media effects (TV) alongside digital channels.
 
 **The two KPIs tracked in this dashboard:**
 - **Leads**: number of qualified contact requests submitted to partner real estate agencies each week. This is the primary conversion metric.
-- **App Downloads**: number of weekly mobile app installs. Downloads are correlated with leads but also driven by digital campaigns (especially Google Ads) and brand awareness (TV).
+- **App Downloads**: number of weekly mobile app installs. Downloads are driven by app install campaigns (Google Play, Apple Search Ads) and brand awareness (TV).
 """)
 
     with st.expander("What data is used?"):
@@ -1600,7 +1613,7 @@ This POC uses **realistic synthetic data** generated from:
 
 - **Real estate transaction volumes**: based on DVF (Demandes de Valeurs Foncières) trends —
   ~1.1M transactions/year in 2020, drop to ~870k in 2023, recovery in 2025
-- **Media spend**: realistic budgets per channel (TV: 8–12M€/year, Google Ads: 5–8M€/year, etc.)
+- **Media spend**: calibrated to SL's publicly available benchmarks (~20M€/year: TV 10M, Google Ads 5M, Meta 2M, Google Play 600K, Apple Search Ads 400K)
   with channel-specific seasonality patterns
 - **Macro variables**: 20-year mortgage rates (real data — ~1.2% in 2020 → ~4% in 2023),
   Pinel tax incentive (phased out), COVID impact
@@ -1630,11 +1643,11 @@ In practice: an extra euro on Google Ads yields proportionally more than an extr
 
 We use a **geometric decay model**: `adstock(t) = spend(t) + decay × adstock(t-1)`
 
-- **TV** (decay = 0.7): long-lasting effect, ~3 weeks — a TV campaign keeps driving leads
-  well after it stops airing
-- **Radio** (decay = 0.4): short effect, ~1 week
-- **RATP Display** (decay = 0.5): medium effect, ~2 weeks
-- **Google Ads** (decay = 0.2): near-immediate effect — clicks convert very quickly
+- **TV** (decay = 0.75): long-lasting effect — a TV campaign keeps driving leads well after it stops airing
+- **Meta** (decay = 0.25): some carry-over from social retargeting and brand recall
+- **Google Play** (decay = 0.10): mostly immediate — app installs happen quickly after ad exposure
+- **Apple Search Ads** (decay = 0.10): similar to Google Play
+- **Google Ads** (decay = 0.05): near-immediate effect — search clicks convert very quickly
 """)
 
     with st.expander("How to read ROAS?"):
@@ -1643,10 +1656,11 @@ We use a **geometric decay model**: `adstock(t) = spend(t) + decay × adstock(t-
 
 | Channel | Typical ROAS | Interpretation |
 |---------|-------------|----------------|
-| Google Ads | ~0.011 | **Most efficient** — each euro generates the most leads |
-| Radio | ~0.010 | Good cost-efficiency |
-| RATP Display | ~0.008 | Decent, but limited to Île-de-France |
-| TV | ~0.004 | **Least efficient** — high cost per lead, but strong branding reach |
+| Google Ads (SEA) | High | **Most efficient** — captures active search intent |
+| Google Play | Good | Strong app install efficiency |
+| Apple Search Ads | Good | Smaller scale but efficient for iOS users |
+| Meta (FB/Insta) | Medium | Good targeting, moderate cost |
+| TV | Low | **Least efficient per lead** — but builds long-term brand awareness |
 
 **Note**: a low ROAS does not mean the channel is useless. TV drives brand awareness
 and a halo effect that benefits other channels (not captured here).
@@ -1658,11 +1672,12 @@ Several factors explain Google Ads' superior profitability:
 
 1. **Intent-based**: users are actively searching for a property → high conversion rate
 2. **Slow saturation** (α = 0.4): returns remain strong even as budget increases
-3. **Immediate effect** (decay = 0.2): no temporal decay — clicks convert quickly
+3. **Immediate effect** (decay = 0.05): no temporal decay — clicks convert quickly
 4. **Precise targeting**: ability to target by region, intent, keyword
 
 Conversely, **TV** has a high entry cost, saturates faster (α = 0.85), and reaches
-a broad but less qualified audience.
+a broad but less qualified audience. App install channels (Google Play, Apple) are also
+efficient but target downloads rather than direct leads.
 """)
 
     with st.expander("How to use the Budget Simulator?"):
@@ -1674,21 +1689,20 @@ The simulator lets you test budget scenarios **in real time**:
 3. Compare the **pie charts**: budget allocation vs. lead contribution
 
 **Tips:**
-- Start by increasing Google Ads → it's the most efficient lever
-- Reduce TV to see the impact → the drop in leads is moderate
-- RATP Display only affects Île-de-France
-- The Google Ads slider has finer steps (1,000€ increments) for precise tuning
+- Start by increasing Google Ads → it's the most efficient lever for immediate lead generation
+- Reduce TV to see the impact → the drop in leads is moderate short-term (but brand awareness erodes)
+- Try increasing Meta or app install channels for a balanced digital mix
+- Google Ads has finer slider steps for precise tuning
 """)
 
-    with st.expander("Why does RATP Display only impact Île-de-France?"):
+    with st.expander("What are the app install channels (Google Play, Apple)?"):
         st.markdown("""
-**RATP Display** refers to advertising displayed across the RATP transit network
-(metro, bus, RER, tramway), which operates exclusively in **Île-de-France**.
+**Google Play campaigns** and **Apple Search Ads** are dedicated app install channels:
 
-In the model:
-- RATP spend is set to **€0** for the other 12 regions
-- Only the IDF region benefits from this channel's effect
-- This is visible on the **Regional Analysis** page → heatmap and IDF chart
+- They target users browsing the app stores (Google Play Store, Apple App Store)
+- The primary metric is **CPI** (Cost Per Install), not CPL
+- App installs contribute indirectly to leads — app users are 3-4x more active than web users
+- These channels peak in spring/summer (rental season, students looking for apartments)
 """)
 
     with st.expander("What is the impact of macroeconomic variables?"):
@@ -1770,7 +1784,7 @@ elif page == "FAQ (FR)":
     with st.expander("Qu'est-ce qu'un MMM (Media Mix Model) ?", expanded=True):
         st.markdown("""
 Un **Media Mix Model** est un modèle statistique qui mesure l'impact de chaque canal média
-(TV, Radio, Digital, Affichage...) sur des KPIs business — ici, les **leads** (demandes de contact
+(TV, Google Ads, Meta, Google Play, Apple Search Ads) sur des KPIs business — ici, les **leads** (demandes de contact
 qualifiées envoyées aux agences immobilières) et les **téléchargements de l'app** (installations de l'application mobile).
 
 Il permet de :
@@ -1780,11 +1794,11 @@ Il permet de :
 - **Isoler l'effet média** des facteurs externes (saisonnalité, taux d'intérêt, COVID...)
 
 Contrairement à l'attribution digitale (last-click, multi-touch), le MMM fonctionne sur des
-données agrégées et capte aussi les effets des médias offline (TV, Radio, Affichage).
+données agrégées et capte aussi les effets des médias offline (TV) et digitaux.
 
 **Les deux KPIs suivis dans ce dashboard :**
 - **Leads** : nombre de demandes de contact qualifiées soumises aux agences immobilières partenaires chaque semaine. C'est la métrique de conversion principale.
-- **Téléchargements App** : nombre d'installations hebdomadaires de l'application mobile. Les téléchargements sont corrélés aux leads mais aussi portés par les campagnes digitales (notamment Google Ads) et la notoriété de marque (TV).
+- **Téléchargements App** : nombre d'installations hebdomadaires de l'application mobile. Les téléchargements sont portés par les campagnes d'installation (Google Play, Apple Search Ads) et la notoriété de marque (TV).
 """)
 
     with st.expander("Quelles données sont utilisées ?"):
@@ -1793,7 +1807,7 @@ Ce POC utilise des **données synthétiques réalistes** générées à partir d
 
 - **Volumes de transactions immobilières** : basés sur les tendances DVF (Demandes de Valeurs Foncières)
   avec ~1.1M transactions/an en 2020, chute à ~870k en 2023, reprise en 2025
-- **Dépenses médias** : budgets réalistes par canal (TV : 8-12M€/an, Google Ads : 5-8M€/an, etc.)
+- **Dépenses médias** : calibrées sur les benchmarks publics de SL (~20M€/an : TV 10M, Google Ads 5M, Meta 2M, Google Play 600K, Apple Search Ads 400K)
   avec des saisonnalités propres à chaque canal
 - **Variables macro** : taux d'intérêt 20 ans (données réelles ~1.2% en 2020 → ~4% en 2023),
   dispositif Pinel (fin progressive), impact COVID
@@ -1823,11 +1837,11 @@ L'**adstock** (ou carry-over) modélise le fait qu'une publicité continue à pr
 
 On utilise un modèle **géométrique** : `adstock(t) = spend(t) + decay × adstock(t-1)`
 
-- **TV** (decay = 0.7) : effet long, ~3 semaines — une campagne TV continue d'impacter les leads
-  bien après sa diffusion
-- **Radio** (decay = 0.4) : effet court, ~1 semaine
-- **RATP Display** (decay = 0.5) : effet moyen, ~2 semaines
-- **Google Ads** (decay = 0.2) : effet quasi-immédiat — les clics se convertissent très vite
+- **TV** (decay = 0.75) : effet long — une campagne TV continue d'impacter les leads bien après sa diffusion
+- **Meta** (decay = 0.25) : un peu de carry-over grâce au retargeting social et la mémorisation
+- **Google Play** (decay = 0.10) : quasi-immédiat — les installations se font vite après l'exposition
+- **Apple Search Ads** (decay = 0.10) : similaire à Google Play
+- **Google Ads** (decay = 0.05) : effet quasi-immédiat — les clics se convertissent très vite
 """)
 
     with st.expander("Comment lire le ROAS ?"):
@@ -1836,10 +1850,11 @@ Le **ROAS (Return On Ad Spend)** mesure le nombre de leads générés par euro i
 
 | Canal | ROAS typique | Interprétation |
 |-------|-------------|----------------|
-| Google Ads | ~0.011 | **Le plus efficient** — chaque euro génère le plus de leads |
-| Radio | ~0.010 | Bon rapport coût-efficacité |
-| RATP Display | ~0.008 | Correct, mais limité à l'Île-de-France |
-| TV | ~0.004 | **Le moins efficient** — coût élevé par lead, mais forte portée branding |
+| Google Ads (SEA) | Élevé | **Le plus efficient** — capte l'intention de recherche active |
+| Google Play | Bon | Forte efficacité pour les installations d'app |
+| Apple Search Ads | Bon | Plus petit volume mais efficient pour iOS |
+| Meta (FB/Insta) | Moyen | Bon ciblage, coût modéré |
+| TV | Faible | **Le moins efficient par lead** — mais construit la notoriété long terme |
 
 **Attention** : un ROAS faible ne signifie pas que le canal est inutile. La TV apporte de la
 notoriété et un effet de halo qui bénéficie aux autres canaux (non mesuré ici).
@@ -1851,7 +1866,7 @@ Plusieurs facteurs expliquent la rentabilité supérieure de Google Ads :
 
 1. **Intent-based** : les utilisateurs cherchent activement un bien immobilier → taux de conversion élevé
 2. **Saturation lente** (α = 0.4) : le rendement reste bon même quand on augmente le budget
-3. **Effet immédiat** (decay = 0.2) : pas de déperdition temporelle, le clic se convertit rapidement
+3. **Effet immédiat** (decay = 0.05) : pas de déperdition temporelle, le clic se convertit rapidement
 4. **Ciblage précis** : possibilité de cibler par région, intention, mot-clé
 
 À l'inverse, la **TV** a un coût d'entrée élevé, sature plus vite (α = 0.85), et touche
@@ -1868,20 +1883,19 @@ Le simulateur permet de tester des scénarios budgétaires **en temps réel** :
 
 **Conseils d'utilisation :**
 - Commencez par augmenter Google Ads → c'est le levier le plus efficient
-- Réduisez la TV pour voir l'impact → la baisse de leads est modérée
-- Le RATP Display n'a d'effet qu'en Île-de-France
-- Le slider Google Ads est plus progressif (pas de 1 000€) pour un réglage fin
+- Réduisez la TV pour voir l'impact → la baisse de leads est modérée à court terme (mais la notoriété s'érode)
+- Testez l'augmentation de Meta ou des canaux d'installation d'app pour un mix digital équilibré
+- Le slider Google Ads est plus progressif pour un réglage fin
 """)
 
-    with st.expander("Pourquoi le RATP Display n'impacte que l'Île-de-France ?"):
+    with st.expander("Quels sont les canaux d'installation d'app (Google Play, Apple) ?"):
         st.markdown("""
-Le **RATP Display** correspond à l'affichage publicitaire dans le réseau RATP
-(métro, bus, RER, tramway), qui est exclusivement situé en **Île-de-France**.
+Les campagnes **Google Play** et **Apple Search Ads** sont des canaux dédiés à l'installation de l'app :
 
-Dans le modèle :
-- Les dépenses RATP sont mises à **0€** pour les 12 autres régions
-- Seule la région IDF bénéficie de l'effet de ce canal
-- C'est visible dans la page **Regional Analysis** → heatmap et graphique IDF
+- Ils ciblent les utilisateurs qui parcourent les stores d'applications
+- La métrique principale est le **CPI** (Coût Par Installation), pas le CPL
+- Les installations d'app contribuent indirectement aux leads — les utilisateurs app sont 3-4x plus actifs que les utilisateurs web
+- Ces canaux sont renforcés au printemps/été (saison locative, étudiants cherchant un appartement)
 """)
 
     with st.expander("Quel est l'impact des variables macro-économiques ?"):

@@ -21,31 +21,35 @@ REGIONS = {
     "Corse": 0.01,
 }
 
-MEDIA_CHANNELS = ["tv", "radio", "ratp_display", "google_ads"]
+MEDIA_CHANNELS = ["tv", "google_ads", "meta", "google_play", "apple_search_ads"]
 
 CHANNEL_LABELS = {
     "tv": "TV",
-    "radio": "Radio",
-    "ratp_display": "RATP Display",
-    "google_ads": "Google Ads",
+    "google_ads": "Google Ads (SEA)",
+    "meta": "Meta (FB/Insta)",
+    "google_play": "Google Play",
+    "apple_search_ads": "Apple Search Ads",
 }
 
 # Adstock decay rates (rémanence)
-# TV/Radio: forte mémoire (on repense à la pub des mois après)
-# Google Ads: effet instantané, coupe = stop
+# TV: forte mémoire (brand awareness, on repense à la pub des mois après)
+# Google Ads / App Install: effet instantané, coupe = stop
+# Meta: léger effet mémoire (retargeting, social)
 ADSTOCK_DECAY = {
     "tv": 0.75,
-    "radio": 0.65,
-    "ratp_display": 0.40,
     "google_ads": 0.05,
+    "meta": 0.25,
+    "google_play": 0.10,
+    "apple_search_ads": 0.10,
 }
 
-# Hill curve saturation alpha
+# Logistic saturation alpha
 SATURATION_ALPHA = {
     "tv": 0.85,
-    "radio": 0.5,
-    "ratp_display": 0.6,
     "google_ads": 0.4,
+    "meta": 0.5,
+    "google_play": 0.6,
+    "apple_search_ads": 0.6,
 }
 
 

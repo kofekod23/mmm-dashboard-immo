@@ -26,7 +26,8 @@ def load_data() -> pd.DataFrame:
 
 def prepare_model_data(df: pd.DataFrame) -> dict:
     """Prepare data arrays for the MMM."""
-    spend_cols = ["spend_tv", "spend_radio", "spend_ratp_display", "spend_google_ads"]
+    from src.utils import MEDIA_CHANNELS
+    spend_cols = [f"spend_{ch}" for ch in MEDIA_CHANNELS]
     control_cols = ["interest_rate_20y", "pinel", "covid_impact"]
 
     X_media = df[spend_cols].values
@@ -54,7 +55,8 @@ def fit_mmm(df: pd.DataFrame, samples: int = 1000, tune: int = 500):
     try:
         from pymc_marketing.mmm import MMM, GeometricAdstock, LogisticSaturation
 
-        channel_columns = ["spend_tv", "spend_radio", "spend_ratp_display", "spend_google_ads"]
+        from src.utils import MEDIA_CHANNELS as _MC
+        channel_columns = [f"spend_{ch}" for ch in _MC]
         control_columns = ["interest_rate_20y", "pinel", "covid_impact"]
         date_column = "date"
         target_column = "leads"
@@ -103,18 +105,24 @@ def _fit_fallback(df: pd.DataFrame) -> dict:
     for col in control_cols:
         features[col] = df[col].values
 
+    # Add seasonality features (sin/cos harmonics)
+    week_num = df["date"].dt.isocalendar().week.astype(int).values
+    features["season_sin"] = np.sin(2 * np.pi * week_num / 52)
+    features["season_cos"] = np.cos(2 * np.pi * week_num / 52)
+
     X = pd.DataFrame(features)
     y = df["leads"].values.astype(float)
 
-    model = Ridge(alpha=1.0)
+    model = Ridge(alpha=20.0)
     model.fit(X, y)
 
     y_pred = model.predict(X)
 
-    # Channel contributions
+    # Channel contributions (clip negative coefficients to 0)
     contributions = {}
     for ch in MEDIA_CHANNELS:
         coef = model.coef_[list(X.columns).index(f"sat_{ch}")]
+        coef = max(coef, 0)  # media channels should have non-negative effect
         contrib = coef * X[f"sat_{ch}"].values
         contributions[ch] = contrib
 
@@ -145,7 +153,7 @@ def predict_leads(model_results: dict, spend_scenario: dict) -> float:
     """
     Predict leads for a given weekly spend scenario using the fallback model.
 
-    spend_scenario: dict like {"tv": 200000, "radio": 100000, ...}
+    spend_scenario: dict like {"tv": 600000, "google_ads": 100000, ...}
     Returns predicted weekly leads (national).
     """
     from src.utils import MEDIA_CHANNELS, ADSTOCK_DECAY, SATURATION_ALPHA
@@ -210,6 +218,7 @@ def save_results(results: dict, output_dir: Path = MODEL_DIR):
 
 
 def main():
+    from src.utils import MEDIA_CHANNELS
     print("Loading data...")
     df = load_data()
     print(f"  {len(df)} rows loaded.")
@@ -219,7 +228,7 @@ def main():
 
     if isinstance(results, dict):
         print(f"\n--- Model Results (R²={results['r2']:.3f}) ---")
-        for ch in ["tv", "radio", "ratp_display", "google_ads"]:
+        for ch in MEDIA_CHANNELS:
             spend = results["total_spend"][ch]
             contrib = results["total_contributions"][ch]
             roas = results["roas"][ch]
@@ -229,7 +238,7 @@ def main():
         save_results(results)
 
         # Test prediction
-        test_scenario = {"tv": 200_000, "radio": 150_000, "ratp_display": 100_000, "google_ads": 120_000}
+        test_scenario = {"tv": 600_000, "google_ads": 100_000, "meta": 40_000, "google_play": 12_000, "apple_search_ads": 8_000}
         pred = predict_leads(results, test_scenario)
         print(f"\nTest prediction (weekly): {pred:,.0f} leads")
     else:
